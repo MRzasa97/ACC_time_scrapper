@@ -1,10 +1,9 @@
-package main
+package app
 
 import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"unsafe"
 
 	"github.com/hidez8891/shm"
@@ -109,89 +108,70 @@ type SPageFileStatic struct {
 	IsOnline                 int32
 }
 
+type PageFile interface {
+	SPageFileGraphic | SPageFileStatic
+}
+
 type BestTime struct {
-	minutes      int32
-	seconds      int32
-	milliseconds int32
+	Minutes      int32
+	Seconds      int32
+	Milliseconds int32
 }
 
-func readSharedMemoryGraphics() (*SPageFileGraphic, error) {
-	sharedMemoryName := "Local\\acpmf_graphics"
+func readSharedMemory[T PageFile]() (*T, error) {
+	var pageFile T
+	var sharedMemoryName string
+	switch (any)(*new(T)).(type) {
+	case SPageFileGraphic:
+		sharedMemoryName = "Local\\acpmf_graphics"
+	case SPageFileStatic:
+		sharedMemoryName = "Local\\acpmf_static"
+	default:
+		return nil, fmt.Errorf("unsupported type")
+	}
+
 	buf := &bytes.Buffer{}
-	pageFile := &SPageFileGraphic{}
-	graphicsSize := (int32)(unsafe.Sizeof(*pageFile))
-	mem, err := shm.Open(sharedMemoryName, graphicsSize)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to open shared memory: %w", err)
-	}
+	staticSize := (int32)(unsafe.Sizeof(pageFile))
 
-	data := make([]byte, graphicsSize)
-	if _, err := mem.Read(data); err != nil {
-		return nil, fmt.Errorf("Failed to read shared memory: %w", err)
-	}
-	buf.Write(data)
-
-	if err := binary.Read(buf, binary.LittleEndian, pageFile); err != nil {
-		return nil, fmt.Errorf("Failed to decode shared memory: %w", err)
-	}
-
-	return pageFile, nil
-}
-
-func readSharedMemoryStatic() (*SPageFileStatic, error) {
-	sharedMemoryName := "Local\\acpmf_static"
-	buf := &bytes.Buffer{}
-	pageFile := &SPageFileStatic{}
-	staticSize := (int32)(unsafe.Sizeof(*pageFile))
 	mem, err := shm.Open(sharedMemoryName, staticSize)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to open shared memory %w", err)
+		return nil, fmt.Errorf("failed to open shared memory %w", err)
 	}
 
 	data := make([]byte, staticSize)
 	if _, err := mem.Read(data); err != nil {
-		return nil, fmt.Errorf("Failed to read shared memory: %w", err)
+		return nil, fmt.Errorf("failed to read shared memory: %w", err)
 	}
 	buf.Write(data)
 
-	if err := binary.Read(buf, binary.LittleEndian, pageFile); err != nil {
-		return nil, fmt.Errorf("Failed to decode shared memory: %w", err)
+	if err := binary.Read(buf, binary.LittleEndian, &pageFile); err != nil {
+		return nil, fmt.Errorf("failed to decode shared memory: %w", err)
 	}
 
-	return pageFile, nil
+	return &pageFile, nil
 }
 
-func convertUint16ArrayToString(arr [33]uint16) string {
-	// Find the end of the string (null terminator)
+func GetBestTime() (*BestTime, error) {
+	bestTime := &BestTime{}
+	pageFileGraphics, err := readSharedMemory[SPageFileGraphic]()
+	if err != nil {
+		return nil, err
+	}
+	bestTime.Minutes = (pageFileGraphics.IBestTime / (1000 * 60)) % 60
+	bestTime.Seconds = (pageFileGraphics.IBestTime / 1000) % 60
+	bestTime.Milliseconds = pageFileGraphics.IBestTime % 1000
+
+	return bestTime, err
+}
+
+func GetCarName() (*string, error) {
 	var endString string
-	for _, value := range arr {
+	pageFileStatic, err := readSharedMemory[SPageFileStatic]()
+	if err != nil {
+		return nil, err
+	}
+	for _, value := range pageFileStatic.CarModel {
 		endString += string(rune(value))
 	}
-	return endString
-}
-
-func convertMillisecondsToTimeStruct(milliseconds int32) *BestTime {
-	bestTime := &BestTime{}
-	bestTime.minutes = (milliseconds / (1000 * 60)) % 60
-	bestTime.seconds = (milliseconds / 1000) % 60
-	bestTime.milliseconds = milliseconds % 1000
-
-	return bestTime
-}
-
-func main() {
-	pageFileGraphics, err := readSharedMemoryGraphics()
-	if err != nil {
-		log.Fatalf("Faile to read shared memory: %v", err)
-	}
-
-	pageFileStatics, err := readSharedMemoryStatic()
-	if err != nil {
-		log.Fatalf("failed to read shared memory: %v", err)
-	}
-
-	bestTime := convertMillisecondsToTimeStruct(pageFileGraphics.IBestTime)
-	car := convertUint16ArrayToString(pageFileStatics.CarModel)
-	fmt.Printf("Best Time: %d:%d:%d ms\n", bestTime.minutes, bestTime.seconds, bestTime.milliseconds)
-	fmt.Printf("%s", car)
+	return &endString, err
 }
