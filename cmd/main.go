@@ -1,61 +1,42 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"log"
 	"os"
+	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
-	"time"
 
-	"github.com/MRzasa97/ACC_time_scrapper/internal/app"
+	"github.com/MRzasa97/ACC_time_scrapper/internal/process"
 )
 
+func isProcessRunningWindows(processName string) (bool, error) {
+	cmd := exec.Command("tasklist")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		return false, err
+	}
+	output := out.String()
+	return strings.Contains(output, processName), nil
+}
+
 func main() {
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		for {
-			select {
-			case <-stop:
-				fmt.Println("Received stop signal. Exiting...")
-				return
-			default:
-				bestTime, err := app.GetBestTime()
-				if err != nil {
-					fmt.Printf("failed to read shared memory: %v", err)
-					fmt.Print("Waiting for data...")
-					time.Sleep(5 * time.Second)
-					continue
-				}
-
-				carModel, err := app.GetCarName()
-				if err != nil {
-					fmt.Printf("failed to read shared memory: %v", err)
-					fmt.Print("Waiting for data...")
-					time.Sleep(5 * time.Second)
-					continue
-				}
-
-				fmt.Printf("Best Time: %d:%d:%d ms\n", bestTime.Minutes, bestTime.Seconds, bestTime.Milliseconds)
-				fmt.Printf("%s", *carModel)
-				time.Sleep(5 * time.Second)
-			}
-		}
-	}()
-	<-stop
-	fmt.Println("Application stopped")
-	// bestTime, err := app.GetBestTime()
-	// if err != nil {
-	// 	log.Fatalf("failed to read best time: %v", err)
-	// }
-
-	// carModel, err := app.GetCarName()
-	// if err != nil {
-	// 	log.Fatalf("failed to read car model: %v", err)
-	// }
-
-	// fmt.Print("Waiting for data...")
-	// fmt.Printf("Best Time: %d:%d:%d ms\n", bestTime.Minutes, bestTime.Seconds, bestTime.Milliseconds)
-	// fmt.Printf("%s", *carModel)
-	// time.Sleep(5 * time.Second)
+	isAccRunning, err := isProcessRunningWindows("AC2-Win64-Shipping.exe")
+	if err != nil {
+		log.Fatalf("error checking process: %v\n", err)
+	}
+	if isAccRunning {
+		stop := make(chan os.Signal, 1)
+		signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+		go process.RunProcess(stop)
+		<-stop
+		fmt.Println("Application stopped")
+	} else {
+		log.Fatal("can't find assetto corsa process. Check if the game is running.")
+	}
 }
