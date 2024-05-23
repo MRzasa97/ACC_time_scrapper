@@ -137,6 +137,7 @@ func readSharedMemory[T PageFile]() (*T, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open shared memory %w", err)
 	}
+	defer mem.Close()
 
 	data := make([]byte, staticSize)
 	if _, err := mem.Read(data); err != nil {
@@ -148,7 +149,16 @@ func readSharedMemory[T PageFile]() (*T, error) {
 		return nil, fmt.Errorf("failed to decode shared memory: %w", err)
 	}
 
+	if isEmpty(pageFile) {
+		return nil, fmt.Errorf("failed to read shared memory.")
+	}
+
 	return &pageFile, nil
+}
+
+func isEmpty[T PageFile](pageFile T) bool {
+	var t T
+	return pageFile == t
 }
 
 func GetBestTime() (*BestTime, error) {
@@ -157,6 +167,7 @@ func GetBestTime() (*BestTime, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	bestTime.Minutes = (pageFileGraphics.IBestTime / (1000 * 60)) % 60
 	bestTime.Seconds = (pageFileGraphics.IBestTime / 1000) % 60
 	bestTime.Milliseconds = pageFileGraphics.IBestTime % 1000
