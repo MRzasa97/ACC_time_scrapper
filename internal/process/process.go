@@ -102,7 +102,7 @@ func sendDataToAPI(data smData, token string) error {
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusCreated {
-		return fmt.Errorf("record was not created. status code: %s", response.StatusCode)
+		return fmt.Errorf("record was not created. status code: %d", response.StatusCode)
 	}
 
 	return nil

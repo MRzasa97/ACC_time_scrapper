@@ -16,12 +16,12 @@ import (
 )
 
 type Credentials struct {
-	Username string "json:username"
-	Password string "json:password"
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 type LoginResponse struct {
-	Token string "json:token"
+	Token string `json:"token"`
 }
 
 func Authenticate() (LoginResponse, error) {
