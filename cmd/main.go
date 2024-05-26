@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/MRzasa97/ACC_time_scrapper/internal/app"
 	"github.com/MRzasa97/ACC_time_scrapper/internal/process"
 )
 
@@ -26,6 +27,12 @@ func isProcessRunningWindows(processName string) (bool, error) {
 }
 
 func main() {
+	token, err := app.Authenticate()
+	if err != nil {
+		log.Fatalf("Error Authentication! %s", err)
+	}
+	fmt.Printf("token: %s\n", token.Token)
+
 	isAccRunning, err := isProcessRunningWindows("AC2-Win64-Shipping.exe")
 	if err != nil {
 		log.Fatalf("error checking process: %v\n", err)
@@ -33,7 +40,7 @@ func main() {
 	if isAccRunning {
 		stop := make(chan os.Signal, 1)
 		signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-		go process.RunProcess(stop)
+		go process.RunProcess(stop, token.Token)
 		<-stop
 		fmt.Println("Application stopped")
 	} else {

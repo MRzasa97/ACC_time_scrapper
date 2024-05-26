@@ -161,7 +161,7 @@ func isEmpty[T PageFile](pageFile T) bool {
 	return pageFile == t
 }
 
-func GetBestTime() (*BestTime, error) {
+func GetBestTime() (*string, error) {
 	bestTime := &BestTime{}
 	pageFileGraphics, err := readSharedMemory[SPageFileGraphic]()
 	if err != nil {
@@ -171,8 +171,9 @@ func GetBestTime() (*BestTime, error) {
 	bestTime.Minutes = (pageFileGraphics.IBestTime / (1000 * 60)) % 60
 	bestTime.Seconds = (pageFileGraphics.IBestTime / 1000) % 60
 	bestTime.Milliseconds = pageFileGraphics.IBestTime % 1000
+	btString := fmt.Sprintf("%d:%d:%d", bestTime.Minutes, bestTime.Seconds, bestTime.Milliseconds)
 
-	return bestTime, err
+	return &btString, err
 }
 
 func GetCarName() (*string, error) {
@@ -184,5 +185,17 @@ func GetCarName() (*string, error) {
 	for _, value := range pageFileStatic.CarModel {
 		endString += string(rune(value))
 	}
-	return &endString, err
+	return &endString, nil
+}
+
+func GetTrackName() (*string, error) {
+	var trackName string
+	pageFileStatic, err := readSharedMemory[SPageFileStatic]()
+	if err != nil {
+		return nil, err
+	}
+	for _, value := range pageFileStatic.Track {
+		trackName += string(rune(value))
+	}
+	return &trackName, nil
 }
