@@ -43,7 +43,7 @@ func main() {
 		signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
 		go process.FuelProcess(stop)
-		go process.RunProcess(stop, token.Token)
+		// go process.RunProcess(stop, token.Token)
 		<-stop
 		fmt.Println("Application stopped")
 	} else {

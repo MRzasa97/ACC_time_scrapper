@@ -9,6 +9,19 @@ import (
 	"github.com/hidez8891/shm"
 )
 
+type AC_STATUS int
+
+const (
+	AC_OFF AC_STATUS = iota
+	AC_REPLAY
+	AC_LIVE
+	AC_PAUSE
+)
+
+type Vector3f struct {
+	X, Y, Z float32
+}
+
 type SPageFileGraphic struct {
 	PacketId              int32
 	Status                int32
@@ -28,13 +41,13 @@ type SPageFileGraphic struct {
 	CurrentSectorIndex    int32
 	LastSectorTime        int32
 	NumberOfLaps          int32
-	TyreCompound          [33]uint16
+	TyreCompound          [34]uint16
 	ReplayTimeMultiplier  float32
 	NormalizedCarPosition float32
 	ActiveCars            int32
-	CarCoordinates        [60][3]float32
+	CarCoordinates        [60]Vector3f
 	CarId                 [60]int32
-	PlayerCarId           int32
+	PlayerCarID           int32
 	PenaltyTime           float32
 	Flag                  int32
 	PenaltyShortCut       int32
@@ -47,11 +60,11 @@ type SPageFileGraphic struct {
 	IsSetupMenuVisible    int32
 	MainDisplayIndex      int32
 	SecondaryDisplayIndex int32
-	TC                    int16
+	TC                    int32
 	TCCut                 int32
 	EngineMap             int32
 	ABS                   int32
-	FuelXLap              float64
+	FuelXLap              float32
 }
 
 type SPageFileStatic struct {
@@ -109,8 +122,6 @@ type BestTime struct {
 	Seconds      int32
 	Milliseconds int32
 }
-
-const fuelXLapOffset = unsafe.Offsetof(SPageFileGraphic{}.FuelXLap)
 
 func readSharedMemory[T PageFile]() (*T, error) {
 	var pageFile T
@@ -218,7 +229,7 @@ func GetIsInPitLane() (int, error) {
 	return int(pageFileStatic.IsInPitLane), nil
 }
 
-func GetFuelXLap() (float64, error) {
+func GetFuelXLap() (float32, error) {
 	pageFileStatic, err := readSharedMemory[SPageFileGraphic]()
 	if err != nil {
 		return 0, err
