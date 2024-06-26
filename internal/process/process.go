@@ -13,14 +13,24 @@ import (
 )
 
 var (
-	lastSentTime string
-	mutex        sync.Mutex
+	lastSentTime   string
+	lastTimeMs     int32
+	lastTimesSlice []int32
+	lastFuelLoad   float64
+	pitStop        lastPitStop
+	mutex          sync.Mutex
 )
+
+type lastPitStop struct {
+	wasInPit      int
+	completedLaps int
+}
 
 type smData struct {
 	CarModel  string `json:"car_model"`
 	BestTime  string `json:"best_time"`
 	TrackName string `json:"track_name"`
+	UserName  string `json:"user_name"`
 }
 
 func RunProcess(stop chan os.Signal, token string) {
@@ -30,6 +40,8 @@ func RunProcess(stop chan os.Signal, token string) {
 			fmt.Println("Received stop signal. Exiting...")
 			return
 		default:
+			time.Sleep(30 * time.Second)
+			fmt.Println("Running API process...")
 			bestTime, err := app.GetBestTime()
 			if err != nil {
 				fmt.Printf("failed to read shared memory: %v", err)
@@ -74,6 +86,102 @@ func RunProcess(stop chan os.Signal, token string) {
 	}
 }
 
+func FuelProcess(stop chan os.Signal) {
+	for {
+		select {
+		case <-stop:
+			fmt.Println("Received stop signal. Exiting...")
+			return
+		default:
+			time.Sleep(5 * time.Second)
+			currentTimeMs, err := app.GetLastTime()
+			if err != nil {
+				fmt.Printf("failed to read shared memory: %v", err)
+				fmt.Print("Waiting for data...")
+				time.Sleep(5 * time.Second)
+				continue
+			}
+			fmt.Print(currentTimeMs)
+			// isPit, err := app.GetIsInPitLane()
+			// if err != nil {
+			// 	fmt.Printf("failed to read pit status from shared memory: %v\n", err)
+			// 	fmt.Println("Waiting for data...")
+			// 	time.Sleep(5 * time.Second)
+			// 	continue
+			// }
+
+			// completedLaps, err := app.GetCompletedLaps()
+			// if err != nil {
+			// 	fmt.Printf("failed to read pit status from shared memory: %v\n", err)
+			// 	fmt.Println("Waiting for data...")
+			// 	time.Sleep(5 * time.Second)
+			// 	continue
+			// }
+
+			// fuelLoapXLap, err := app.GetFuelXLap()
+			// if err != nil {
+			// 	fmt.Printf("failed to read pit status from shared memory: %v\n", err)
+			// 	fmt.Println("Waiting for data...")
+			// 	time.Sleep(5 * time.Second)
+			// 	continue
+			// }
+
+			// sessionTimeLeft, err := app.GetSessionTimeLeft()
+			// if err != nil {
+			// 	fmt.Printf("failed to read pit status from shared memory: %v\n", err)
+			// 	fmt.Println("Waiting for data...")
+			// 	time.Sleep(5 * time.Second)
+			// 	continue
+			// }
+
+			// if isPit > 0 {
+			// 	fmt.Println("Car is Pitting!")
+			// 	mutex.Lock()
+			// 	pitStop.wasInPit = isPit
+			// 	pitStop.completedLaps = completedLaps
+			// 	mutex.Unlock()
+			// }
+
+			// mutex.Lock()
+			// if currentTimeMs != lastTimeMs {
+			// 	lastTimeMs = currentTimeMs
+			// 	if fuelLoapXLap > 0 && completedLaps > 0 {
+			// 		lastFuelLoad = fuelLoapXLap
+			// 	}
+			// 	if isPit == 0 && pitStop.completedLaps != completedLaps {
+			// 		lastTimesSlice = append(lastTimesSlice, lastTimeMs)
+			// 		fmt.Println("Added time to map!")
+			// 	}
+			// 	mutex.Unlock()
+			// 	fmt.Printf("Current time: %d \n", currentTimeMs)
+
+			// } else {
+			// 	mutex.Unlock()
+			// }
+
+			// mutex.Lock()
+			// if len(lastTimesSlice) > 1 {
+			// 	fuelLoad := countFuelLoad(lastTimesSlice, lastFuelLoad, sessionTimeLeft)
+			// 	mutex.Unlock()
+			// 	fmt.Printf("estimated fuel: %f \n last fuel: %f, session left: %f", fuelLoad, lastFuelLoad, sessionTimeLeft)
+			// } else {
+			// 	mutex.Unlock()
+			// }
+		}
+	}
+}
+
+func countFuelLoad(lastTimesSlice []int32, fuelLoadXLap float64, sessionTimeLeft float32) float64 {
+	var timeSum int32
+	for i := 0; i < len(lastTimesSlice); i++ {
+		timeSum += lastTimesSlice[i]
+	}
+	timeSum += 2 * lastTimesSlice[len(lastTimesSlice)-1]
+	avgTime := float64(timeSum / (int32(len((lastTimesSlice)) + 2)))
+	lapsLeft := float64(sessionTimeLeft) / avgTime
+	estimatedFuel := lapsLeft * fuelLoadXLap
+	return estimatedFuel
+}
 func sendDataToAPI(data smData, token string) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {

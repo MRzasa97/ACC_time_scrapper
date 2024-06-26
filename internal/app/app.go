@@ -10,56 +10,48 @@ import (
 )
 
 type SPageFileGraphic struct {
-	PacketId                 int32
-	Status                   int32
-	SessionType              int32
-	CurrentTime              [15]uint16
-	LastTime                 [15]uint16
-	BestTime                 [15]uint16
-	Split                    [15]uint16
-	CompletedLaps            int32
-	Position                 int32
-	ICurrentTime             int32
-	ILastTime                int32
-	IBestTime                int32
-	SessionTimeLeft          float32
-	DistanceTraveled         float32
-	IsInPit                  int32
-	CurrentSectorIndex       int32
-	LastSectorTime           int32
-	NumberOfLaps             int32
-	TyreCompound             [33]uint16
-	ReplayTimeMultiplier     float32
-	NormalizedCarPosition    float32
-	ActiveCars               int32
-	CarCoordinates           [60][3]float32
-	CarId                    [60]int32
-	PlayerCarId              int32
-	PenaltyTime              float32
-	Flag                     int32
-	PenaltyShortCut          int32
-	IdealLineOn              int32
-	IsInPitLane              int32
-	SurfaceGrip              float32
-	MandatoryPitDone         int32
-	WindSpeed                float32
-	WindDirection            float32
-	IsSetupMenuVisible       int32
-	MainDisplayIndex         int32
-	SecondaryDisplayIndex    int32
-	TC                       int32
-	TCCut                    int32
-	EngineMap                int32
-	ABS                      int32
-	FuelXLap                 int32
-	RainLights               int32
-	FlashingLights           int32
-	LightStage               int32
-	ExhaustTemperature       float32
-	WiperLevel               int32
-	DriverStintTotalTimeLeft int32
-	DriverStintTimeLeft      int32
-	RainTyres                int32
+	PacketId              int32
+	Status                int32
+	SessionType           int32
+	CurrentTime           [15]uint16
+	LastTime              [15]uint16
+	BestTime              [15]uint16
+	Split                 [15]uint16
+	CompletedLaps         int32
+	Position              int32
+	ICurrentTime          int32
+	ILastTime             int32
+	IBestTime             int32
+	SessionTimeLeft       float32
+	DistanceTraveled      float32
+	IsInPit               int32
+	CurrentSectorIndex    int32
+	LastSectorTime        int32
+	NumberOfLaps          int32
+	TyreCompound          [33]uint16
+	ReplayTimeMultiplier  float32
+	NormalizedCarPosition float32
+	ActiveCars            int32
+	CarCoordinates        [60][3]float32
+	CarId                 [60]int32
+	PlayerCarId           int32
+	PenaltyTime           float32
+	Flag                  int32
+	PenaltyShortCut       int32
+	IdealLineOn           int32
+	IsInPitLane           int32
+	SurfaceGrip           float32
+	MandatoryPitDone      int32
+	WindSpeed             float32
+	WindDirection         float32
+	IsSetupMenuVisible    int32
+	MainDisplayIndex      int32
+	SecondaryDisplayIndex int32
+	TC                    int16
+	TCCut                 int32
+	EngineMap             int32
+	ABS                   int32
+	FuelXLap              float64
 }
 
 type SPageFileStatic struct {
@@ -83,7 +75,7 @@ type SPageFileStatic struct {
 	Deprecated1              float32
 	Deprecated2              float32
 	PenaltiesEnabled         int32
-	AidFuelRate              int32
+	AidFuelRate              float32
 	AidTireRate              int32
 	AidMechanicalDamage      float32
 	AidAllowTyreBlankets     int32
@@ -117,6 +109,8 @@ type BestTime struct {
 	Seconds      int32
 	Milliseconds int32
 }
+
+const fuelXLapOffset = unsafe.Offsetof(SPageFileGraphic{}.FuelXLap)
 
 func readSharedMemory[T PageFile]() (*T, error) {
 	var pageFile T
@@ -176,6 +170,26 @@ func GetBestTime() (*string, error) {
 	return &btString, err
 }
 
+func GetLastTime() (int32, error) {
+	pageFileGraphics, err := readSharedMemory[SPageFileGraphic]()
+	if err != nil {
+		return 0, err
+	}
+
+	return pageFileGraphics.ILastTime, err
+}
+
+func GetSectorTimes() (map[int]int, error) {
+	sectorTimes := make(map[int]int)
+	pageFileGraphics, err := readSharedMemory[SPageFileGraphic]()
+	if err != nil {
+		return nil, err
+	}
+
+	sectorTimes[int(pageFileGraphics.CurrentSectorIndex)-1] = int(pageFileGraphics.LastSectorTime)
+	return sectorTimes, err
+}
+
 func GetCarName() (*string, error) {
 	var endString string
 	pageFileStatic, err := readSharedMemory[SPageFileStatic]()
@@ -186,6 +200,40 @@ func GetCarName() (*string, error) {
 		endString += string(rune(value))
 	}
 	return &endString, nil
+}
+
+func GetCompletedLaps() (int, error) {
+	pageFileStatic, err := readSharedMemory[SPageFileGraphic]()
+	if err != nil {
+		return 0, err
+	}
+	return int(pageFileStatic.CompletedLaps), nil
+}
+
+func GetIsInPitLane() (int, error) {
+	pageFileStatic, err := readSharedMemory[SPageFileGraphic]()
+	if err != nil {
+		return 0, err
+	}
+	return int(pageFileStatic.IsInPitLane), nil
+}
+
+func GetFuelXLap() (float64, error) {
+	pageFileStatic, err := readSharedMemory[SPageFileGraphic]()
+	if err != nil {
+		return 0, err
+	}
+
+	return pageFileStatic.FuelXLap, nil
+}
+
+func GetSessionTimeLeft() (float32, error) {
+	pageFileStatic, err := readSharedMemory[SPageFileGraphic]()
+	if err != nil {
+		return 0, err
+	}
+
+	return float32(pageFileStatic.SessionTimeLeft), nil
 }
 
 func GetTrackName() (*string, error) {

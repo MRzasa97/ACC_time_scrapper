@@ -39,7 +39,10 @@ func main() {
 	}
 	if isAccRunning {
 		stop := make(chan os.Signal, 1)
+
 		signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+		go process.FuelProcess(stop)
 		go process.RunProcess(stop, token.Token)
 		<-stop
 		fmt.Println("Application stopped")
